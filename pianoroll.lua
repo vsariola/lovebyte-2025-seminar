@@ -1,21 +1,19 @@
 -- t:   time (60 ticks / s)
 -- chn: channel (0-3)
-pat={0,0,4,2,3,3,6,6,0,0,2,3,4,4,3,2}
 function note(t, chn)
- return pat[(t*chn>>6)%#pat+1]
+ return (t >> 4) % 12
 end
 
 -- t: time
-prog={1,1,0,0,1,1,3.9,4} 
 function chord(t)
- return prog[(t>>7)%#prog+1]
+ return 0
 end
 
 -- n: note (returned by func "note")
 -- c: chord (returned by func "chord")
 -- chn: channel (0-3)
 function mapping(n, c, chn)
- return (n+c+5)*12//7-1+n%7//6 
+ return n + c
 end
 
 function mapped(t, chn)
@@ -38,9 +36,6 @@ PIANO_HEIGHT = 25
 PIANO_BLACK_HEIGHT = 15
 PIANO_NUM_KEYS = 51
 PMEM_PLAY = 10
-PMEM_SX = 11
-PMEM_SLIDE = 12
-PMEM_SHOW_SLIDES = 13
 PMEM_CHORDS = 0
 PMEM_MAPPING = 1
 PMEM_BG = 2
@@ -109,9 +104,6 @@ chn_cbs = {{}, {}, {}, {}}
 
 play = pmem(PMEM_PLAY) > 0 and true or false
 t = 0
-sx = pmem(PMEM_SX)
-slide = pmem(PMEM_SLIDE)
-show_slides = pmem(PMEM_SHOW_SLIDES) > 0 and true or false
 
 mapcache = {}
 function TIC()
@@ -127,12 +119,11 @@ function TIC()
  vbank(0)
  cls(0)
  draw_background()
- -- background colors are gray
- local a = 1 - sx / 240
+ -- background colors are gray 
  for i = 0, 15 do
-  poke(16320 + i * 3 + 0, i * 255 / 15 * a);
-  poke(16320 + i * 3 + 1, i * 255 / 15 * a);
-  poke(16320 + i * 3 + 2, i * 255 / 15 * a);
+  poke(16320 + i * 3 + 0, i * 255 / 15);
+  poke(16320 + i * 3 + 1, i * 255 / 15);
+  poke(16320 + i * 3 + 2, i * 255 / 15);
  end
 
  if chords_cb.checked then
@@ -143,12 +134,7 @@ function TIC()
  end
  vbank(1)
  cls(0)
- if sx > 0 then
-  draw_slides()
- end
- if sx < 240 then
-  draw_gui()
- end
+ draw_gui()
  if play then
   t = t + 1
  end
@@ -161,79 +147,21 @@ function TIC()
  if keyp(55) then
   t = 0
  end
- if keyp(60) then
-  show_slides = true
- end
- if keyp(61) then
-  show_slides = false
- end
- sx = clamp(sx + (show_slides and 32 or -32), 0, 240)
  pmem(PMEM_PLAY, play and 1 or 0)
- pmem(PMEM_SX, sx)
- pmem(PMEM_SLIDE, slide)
- pmem(PMEM_SHOW_SLIDES, show_slides and 1 or 0)
-end
-
-slides = {
- {
-  {{t="LOVEBYTE 2025", x=0, y=10, c=15, s=3}, {t="Making Tiny Music with the 12-tone Scale", x=0, y=35, c=14}},
-  {{t="- MIDI", x=0, y=55, c=10}}, {{t="- TIC-80", x=0, y=65, c=10}},
-  {{t="- Anywhere where you can pow(2,n/12)", x=0, y=75, c=10}}
- }, {
-  {{t="PROBLEMS", x=0, y=10, c=15, s=3}}, {
-   {
-    t="1) Hard to make good chord progressions\n   with only major chords, and even more\n   difficult with only minor chords",
-    x=0, y=55, c=10
-   }
-  }, {{t="2) Voice leading is not smooth\n   (chords always at root position)", x=0, y=80, c=10}}
- }, {
-  {
-   {t="RRROLA TRICK:", x=0, y=10, c=15, s=3}, {t="n*12//7", x=100, y=35, c=14},
-   {t="- maps 7-tone scale to 12-tone scale", x=0, y=55, c=10}
-  }, {{t="- starting from n=0 is the Locrian mode,\n  but (n+1)*12//7 is the Ionian mode", x=0, y=70, c=10}}
- }, {
-  {{t="HOMEWORK", x=0, y=10, c=15, s=3}},
-  {{t="1) Try the RRROLA trick with *12//5.\n   What scale is this?\n   What are its two most useful modes?", x=0, y=55, c=10}},
-  {{t="2) Find the smallest equation for\n   harmonic minor scale", x=0, y=80, c=10}},
-  {{t="3) Try the RRROLA trick with the\n   chord-function returning\n   non-integer values.\n   What useful chords you find? ", x=0, y=100, c=10}}  
- }
-}
-
-function draw_slides()
- local sstart = 0
- for i = 1, #slides do
-  for j = 1, #slides[i] do
-   if slide < sstart + j - 1 or slide >= sstart + #slides[i] then
-    goto continue
-   end
-   for k = 1, #slides[i][j] do
-    local e = slides[i][j][k]
-    local x = e.x or 0
-    local y = e.y or 0
-    local c = e.c or 15
-    local s = e.s or 1
-    print(e.t, x + sx - 240, y, c, 1, s)
-   end
-   ::continue::
-  end
-  sstart = sstart + #slides[i]
- end
- slide = slide + (keyp(59) and 1 or 0)
- slide = slide - (keyp(58) and 1 or 0)
- slide = clamp(slide, 0, sstart - 1)
 end
 
 function draw_gui()
  draw_pianoroll()
  draw_keys(keys_state)
- x = sx
+ x = 0
  x = x + 5 + checkbox(chords_cb, "chords", x, 130, PMEM_CHORDS)
  x = x + 5 + checkbox(mapping_cb, "mapping", x, 130, PMEM_MAPPING)
  x = x + 5 + checkbox(bg_cb, "bg", x, 130, PMEM_BG)
  x = x + 5 + checkbox(time_cb, "t", x, 130, PMEM_DRAWTIME, nil, function()
   t = 0
  end)
- x = 216 + sx
+ x = 216
+ print("channels", 164, 130)
  for i = 0, 3 do
   x = x + 1 + checkbox(chn_cbs[i + 1], "", x, 130, PMEM_CHANS + i, 1 << i, function(s)
    for j = 0, 3 do
@@ -265,7 +193,7 @@ function play_sounds()
   if chan == 0 and keys_state.pressed ~= nil and keys_state.pressed >= 0 then
    n = keys_state.pressed
   end
-  if play_sounds_notes[chan + 1] ~= n then  
+  if play_sounds_notes[chan + 1] ~= n then
    play_sounds_notes[chan + 1] = n
    if n >= 0 then
     sfx(0, n + 12, 1000, chan, 15)
@@ -287,7 +215,7 @@ function draw_pianoroll()
    if pianoroll_tmp[chan + 1] >= 0 then
     local x, w, type = pianokey(pianoroll_tmp[chan + 1])
     local C = keycolor(pianoroll_tmp[chan + 1], pianoroll_tmp)
-    rect(x + sx, PIANO_Y - i - 1, w, 1, C)
+    rect(x, PIANO_Y - i - 1, w, 1, C)
    end
   end
  end
@@ -329,39 +257,37 @@ function draw_chord_lines()
     w = j < 3 and _dcl_tmp[j + 2].x - x or 1e6
    end
    draw_background(y - 14, y + 1)
-   print(c1, sx + x + 1, y - 14, 8, 1, 3)
+   print(c1, x + 1, y - 14, 8, 1, 3)
    c2 = c1
   end
   if c ~= c1 then
    c1 = c
-   rect(sx, y, 240, 1, 8)
+   rect(0, y, 240, 1, 8)
   end
  end
 end
 
 function draw_time()
- if sx < 240 then
-  local y = PIANO_Y - 1
-  right("t=" .. t, 228, y - 5, 8)
-  local t0 = -t % 8
-  for i = t0, PIANO_Y, 8 do
-   local T = t + i
-   local b = T >> 3 & 15
-   local l = 1
-   if b == 0 then
-    l = 12
-   elseif b == 8 then
-    l = 6
-   end
-   local y = PIANO_Y - i - 1
-   rect(240 - l, y, l, 1, 8)
+ local y = PIANO_Y - 1
+ right("t=" .. t, 228, y - 5, 8)
+ local t0 = -t % 8
+ for i = t0, PIANO_Y, 8 do
+  local T = t + i
+  local b = T >> 3 & 15
+  local l = 1
+  if b == 0 then
+   l = 12
+  elseif b == 8 then
+   l = 6
   end
+  local y = PIANO_Y - i - 1
+  rect(240 - l, y, l, 1, 8)
  end
 end
 
 function draw_keys(keys_state)
  local y = PIANO_Y
- rect(sx, y, 240, PIANO_HEIGHT, 0)
+ rect(0, y, 240, PIANO_HEIGHT, 0)
  local text_y = (PIANO_HEIGHT + PIANO_BLACK_HEIGHT - 5) // 2 + PIANO_Y
  local text_bg = nil
  local key_height = PIANO_HEIGHT
@@ -379,7 +305,6 @@ function draw_keys(keys_state)
  for T = 0, 1 do
   for i = 0, PIANO_NUM_KEYS - 1 do
    x, w, type = pianokey(i)
-   x = x + sx
    if type == T then
     rectb(x - 1, PIANO_Y, w + 2, key_height, 0) -- black outline
     local C = keycolor(i, pianoroll_tmp)
